@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Custom Quirk Stack Builder</title>
+<style>
+  :root{
+    --cream:#EEE7D6; --navy:#0B1120; --navyHover:#1a2744; --brandRed:#C85158;
+    --muted:#3c4150; --border: rgba(11,17,32,.14); --ok:#1d8a58; --bad:#c0273a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--cream);color:var(--navy);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .page-title{margin:28px 18px 6px;font-size:clamp(42px,7vw,88px);line-height:1;color:var(--navy);font-family:Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif;letter-spacing:1px}
+  .wrap{display:grid;grid-template-columns:1fr 380px;gap:18px;padding:18px}
+  .card{background:#fff;border:1px solid var(--border);border-radius:0;padding:16px}
+
+  /* Square navy buttons */
+  .btn{font-family:Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif;text-transform:uppercase;letter-spacing:2px;
+    padding:12px 16px;border-radius:0;cursor:pointer;border:2px solid var(--navy);background:var(--navy);color:var(--cream);
+    transition:background-color .15s,border-color .15s}
+  .btn:hover{background:var(--navyHover);border-color:var(--navyHover)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn-ghost{background:#fff;color:var(--navy)}
+  .btn-ghost:hover{background:var(--navyHover);color:var(--cream)}
+
+  input{padding:10px;border:2px solid var(--navy);border-radius:0;width:100%}
+
+  .slots{display:grid;gap:12px;grid-template-columns:repeat(5,1fr)}
+  .slot{display:grid;place-items:center;min-height:92px;border:2px dashed var(--border);border-radius:0;cursor:pointer;position:relative}
+  .slot:hover{border-color:var(--navy)} .slot.active{outline:3px solid var(--navy)}
+  .slot .label{position:absolute;top:8px;left:10px;font-size:12px;color:var(--muted)}
+  .slot .value{font-weight:800;text-align:center;padding:0 8px}
+  .slot .clear{position:absolute;right:6px;top:6px;font-size:11px;color:#6b7280;background:transparent;border:0;cursor:pointer}
+  .slot .clear:hover{color:var(--navy)}
+  .slot.filled{background:var(--navy);color:var(--cream);border-color:var(--navy)} .slot.filled .label{color:#d7dce6}
+
+  .picker h2{margin:8px 0 10px;font-size:20px;font-family:Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif}
+  .bar{display:grid;gap:8px;margin:10px 0 12px}
+  .row{display:flex;justify-content:space-between;color:#4b5563;font-size:13px}
+  progress{width:100%;height:12px;accent-color:var(--brandRed);background:#efe9da}
+  progress::-webkit-progress-bar{background:#efe9da}
+  progress::-webkit-progress-value{background:var(--brandRed)}
+
+  .filter{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .chip{font-family:Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif;letter-spacing:1px;border:2px solid var(--navy);background:#fff;color:var(--navy);
+    border-radius:0;padding:6px 12px;font-size:12px;cursor:pointer}
+  .chip.active{background:var(--navy);color:var(--cream)}
+
+  .list{display:grid;gap:8px;max-height:52vh;overflow:auto;padding-right:6px}
+  .item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px;border:1px solid var(--border);border-radius:0;background:#fff}
+  .item .name{font-weight:800;color:var(--navy)} .item .meta{font-size:12px;color:#6b7280} .item.disabled{opacity:.45}
+
+  .right h3{margin:8px 0;font-size:18px;font-family:Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;color:#4b5563;font-size:13px}
+  .status{margin:8px 0;font-weight:900}.status.ok{color:var(--ok)}.status.bad{color:var(--bad)}
+  .priceRow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border)}
+  .total{font-size:22px;font-weight:900}
+  pre#yamlPreview{background:#f6f7f9;border:1px solid var(--border);padding:10px;border-radius:0;white-space:pre;overflow:auto}
+</style>
+</head>
+<body>
+
+<h1 class="page-title">CUSTOM QUIRK STACK BUILDER</h1>
+
+<main class="wrap">
+  <section class="card">
+    <!-- Player info -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end;margin-bottom:12px">
+      <div>
+        <label for="stackName" style="font-family:Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif">Custom Stack Name</label>
+        <input id="stackName" placeholder="e.g., Phoenix Vanguard" />
+      </div>
+      <div>
+        <label for="mcName" style="font-family:Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif">Minecraft Username</label>
+        <input id="mcName" placeholder="optional" />
+      </div>
+      <div>
+        <label for="discordName" style="font-family:Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif">Discord Username</label>
+        <input id="discordName" placeholder="optional" />
+      </div>
+      <div style="grid-column:1 / -1;color:#6b7280;font-size:13px">Provide at least <strong>one</strong> contact (Minecraft or Discord).</div>
+    </div>
+
+    <!-- Slots -->
+    <div class="slots" id="slots"></div>
+
+    <!-- Picker -->
+    <div class="picker" id="picker">
+      <h2>Choose an Ability <span style="font-weight:400;letter-spacing:0">(click a slot above)</span></h2>
+
+      <div class="bar">
+        <div class="row"><span>Points</span><span><span id="costNow">0</span>/<span id="costMax">20</span></span></div>
+        <progress id="costBar" value="0" max="20"></progress>
+        <div class="row"><span>Total Price</span><span id="cashTotal" style="font-weight:800">$0.00</span></div>
+      </div>
+
+      <div class="filter" id="quirkFilter"></div>
+      <div class="list" id="abilityList"></div>
+    </div>
+  </section>
+
+  <aside class="card right">
+    <h3>Summary</h3>
+    <div class="kv">
+      <div>Points max:</div><div id="ruleBudget">20</div>
+      <div>Per-quirk cap:</div><div>≤30% of current stack size (min 1)</div>
+    </div>
+    <div class="status ok" id="status">Valid</div>
+
+    <h3>Order</h3>
+    <div class="priceRow"><span>Items</span><span id="itemCount">0</span></div>
+    <div class="priceRow"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
+    <div class="priceRow total"><span>Total</span><span id="grand">$0.00</span></div>
+    <button id="btnCheckout" class="btn" disabled>Checkout</button>
+
+    <!-- Stack output (below checkout) -->
+    <h3 style="margin-top:16px">Your Quirk Stack (YAML)</h3>
+    <pre id="yamlPreview"></pre>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="copyYaml">Copy YAML</button>
+      <button class="btn" id="downloadYaml">Download YAML</button>
+      <button class="btn" id="emailYaml">Email to Admin</button>
+    </div>
+  </aside>
+</main>
+
+<script>
+/* =======================
+   0) CONFIG
+   ======================= */
+const CONFIG = { budgetMax:20 };
+document.getElementById('costMax').textContent = CONFIG.budgetMax;
+document.getElementById('costBar').max = CONFIG.budgetMax;
+
+/* =======================
+   1) YOUR QUIRK STACK (YAML)
+   - Quirks with only 1 ability are excluded
+   - Abilities starting with "Domain"/"Maximum" are removed
+   ======================= */
+const QUIRK_YAML = `
+Absorb:
+  Absorb: 1
+Arbor:
+  WoodWhip: 1
+  EmergingForest: 1
+  WoodWall: 1
+  WoodStrike: 3
+  CuttingSprigs: 4
+  WoodLasso: 5
+  WoodArmor: 7
+  LacquerChainPrison: 9
+  DeepForestEmergence: 12
+Acid:
+  Acid: 1
+  AcidSkate: 1
+  AcidShot: 3
+  AcidVeil: 5
+  AcidGeiser: 7
+  AcidMan: 9
+Alchemy:
+  CoinToss: 1
+  Transmutation: 2
+  WIP: 4
+  HumanTransmutation: 10
+Adaptation:
+  Adaptation: 1
+  AdaptationList: 1
+AirCannon:
+  AirborneDash: 1
+  FocusedBlast: 2
+  ShockwaveBlast: 3
+  ShockwaveSlam: 4
+  TornadoCannon: 5
+Alien:
+  Alien: 1
+AmpliVoice:
+  LoudVoice: 1
+  Screech: 5
+Barrier:
+  BarrierCreation: 1
+  BarrierExpansion: 2
+  BarrierWave: 3
+  MultiLayerBarrier: 4
+BigHands:
+  BigHands: 1
+BlackHole:
+  SingularityCore: 2
+  VoidPurge: 5
+  ZeroSpace: 7
+  GravityImplode: 10
+BlackWhip:
+  BlackWhip: 1
+  WhipLasso: 2
+  WhipStrike: 3
+BloodCurdle:
+  BloodCurdle: 1
+  BloodFrenzy: 2
+BrawnBoost:
+  BrawnBoost: 1
+BulletLaser:
+  LaserBurst: 1
+  LaserSpread: 2
+  PrecisionShot: 3
+  RapidFire: 4
+  ReflectiveBeam: 5
+Bunny:
+  Bunny: 1
+  LunaKick: 1
+  LunaRing: 3
+  LunaSmash: 5
+  LunaSpinKick: 7
+  Tezcatlipoca: 10
+BoogieWoogie:
+  FalseClap: 1
+  BoogieWoogie: 1
+  BestoFriendo: 1
+  VibraSlap: 1
+CellActivation:
+  CellActivation: 1
+Cement:
+  Fortress: 5
+  ConcreteCage: 3
+  HeavensPillar: 7
+  Earthquake: 1
+Compress:
+  Compress: 1
+  CompressMarbles: 1
+CurseMark:
+  CurseEnergy: 1
+  CurseActivation: 3
+Clone:
+  CloneCreation: 1
+  CloneManage: 1
+Cremation:
+  Temperature: 1
+  CremationFlamingCoatingArms: 1
+  CremationFireball: 1
+  CremationBlaze: 3
+  CremationFireFlight: 5
+  CremationFlamethrower: 7
+  CremationHellSpider: 9
+  CremationFlashfireFist: 11
+  CremationProminenceBurn: 13
+Decay:
+  Decay: 1
+  DeadGround: 5
+  GlobalCatastrophe: 10
+DangerSense:
+  DangerSense: 1
+Engine:
+  Rush: 1
+  ReciproBurst: 5
+Erasure:
+  Erasure: 1
+Explosion:
+  Blast: 1
+  BlastJump: 2
+  APShot: 5
+  HowitzerImpact: 7
+Electrification:
+  StunGun: 1
+  SuperCharge: 1
+  Discharge: 3
+  ElectricShield: 5
+  IndiscriminateShock: 7
+  Sharpshooter: 9
+Fajin:
+  Fajin: 1
+FierceWings:
+  FierceWings: 1
+  FeatherControl: 3
+  FeatherVolley: 4
+  HawkSlice: 5
+  FeatherBlade: 7
+  FalconDive: 9
+Fiber:
+  StyleReinforcement: 1
+  FiberGrapple: 2
+  ThreadLash: 5
+  ThreadLead: 5
+  NeedleSpool: 7
+Flight:
+  ExplosiveFlight: 1
+  Float: 2
+  FlightLesser: 3
+ForcePush:
+  ForcePush: 1
+Frog:
+  FrogTongue: 1
+  Invisibility: 3
+  TongueSlash: 5
+Gigantification:
+  SizeChange: 1
+  Stomp: 3
+  Swat: 5
+  SlideTackle: 7
+Harden:
+  Harden: 1
+  Unbreakable: 7
+Horns:
+  Horns: 1
+  TrackingHorn: 5
+HellFlame:
+  Temperature: 1
+  FlamingCoatingArms: 1
+  Fireball: 1
+  Blaze: 3
+  FireFlight: 5
+  Flamethrower: 7
+  HellSpider: 9
+  FlashfireFist: 11
+  ProminenceBurn: 13
+Ice:
+  FlashFreeze: 1
+  WorldCuttingGlacier: 1
+  IceSpike: 1
+  Freeze: 1
+  IceSkate: 1
+ImpactRecoil:
+  ImpactRecoil: 1
+ImpureBeam:
+  DarkBall: 1
+  LightBall: 1
+IdleTransfiguration:
+  SelfTransfiguration: 2
+  Transfiguration: 4
+  TrueForm: 6
+  SelfEmbodimentOfPerfection: 8
+Jet:
+  Jet: 1
+  RockedPunch: 3
+  MultiStrike: 5
+Kasso:
+  SlideAndGlide: 1
+  ClingAndClimb: 3
+  Repulsion: 5
+  ShootyGo: 7
+  ShootyBarrierBarrage: 10
+Limitless:
+  Infinity: 1
+  LapseBlue: 2
+  ReversalRed: 6
+  HollowPurple: 10
+  InfinityVoid: 11
+SixEyes:
+  SixEyes: 1
+Lizard:
+  Lizard: 1
+  LizardClimb: 2
+MetalManipulation:
+  IronBullet: 1
+  MetallicVines: 5
+  IronCoffin: 7
+  TitaniumFist: 11
+MolecularRegeneration:
+  MolecularRegeneration: 1
+MuscleAugmentation:
+  MuscleForm: 3
+OneForAllAllMight:
+  PowerUp: 1
+  TexasSmash: 3
+  DetroitSmash: 4
+  NewHampshireSmash: 5
+  CaliforniaSmash: 7
+  UnitedStatesOfSmash: 9
+Orca:
+  Orca: 1
+  Sonar: 3
+  Echolocation: 4
+  HypersonicWave: 5
+Overmodification:
+  Overmodification: 3
+  SelfModification: 5
+Overhaul:
+  Reassemble: 1
+  Dissasemble: 2
+  Spikes: 5
+  HoningSpike: 7
+Payload:
+  Payload: 1
+Phase:
+  Phase: 1
+PopOff:
+  PopOff: 1
+  GrapeBall: 1
+  GrapeVine: 3
+  GrapeRush: 6
+  BendyBallPop: 8
+Rifle:
+  BulletCreation: 1
+  Snipe: 1
+  AwakenedRailgun: 9
+Search:
+  Search: 1
+SuperRegeneration:
+  SuperRegeneration: 1
+Steel:
+  Steel: 1
+SugarRush:
+  SugarRush: 1
+ShapeShift:
+  ShapeShift: 1
+Shrine:
+  Cleave: 2
+  Dismantle: 5
+  Fuga: 10
+TurboGranny:
+  GrannyTransform: 2
+  TurboDash: 5
+  AllOutDash: 10
+Volcano:
+  Volcano: 1
+  LandmineVolcano: 3
+  Eruption: 5
+  MaximumMeteor: 7
+  CoffinOfTheIronMountainc: 9
+Water:
+  Spout: 1
+  Torrent: 3
+  Wave: 5
+WeakSpot:
+  WeakSpot: 1
+`;
+
+/* =======================
+   2) Parse YAML → Data
+   ======================= */
+function parseQuirkYaml(src){
+  const raw = {};
+  let cur = null;
+
+  for (const r of src.split(/\r?\n/)) {
+    const line = r.replace(/\t/g, '  ');
+    if (!line.trim()) continue;
+
+    // Quirk header
+    if (!line.startsWith(' ') && line.trim().endsWith(':')) {
+      cur = line.slice(0, line.lastIndexOf(':')).trim();
+      if (!cur) continue;
+      raw[cur] = [];
+      continue;
+    }
+
+    // Ability line (tolerant)
+    const m = line.match(/^\s*([^:]+):\s*([0-9]+)\s*$/);
+    if (m && cur) {
+      const name = m[1].trim();
+      const level = parseInt(m[2].trim(), 10);
+      if (name.startsWith('Domain') || name.startsWith('Maximum')) continue; // filter out
+      raw[cur].push({ name, level: Number.isFinite(level) ? level : 1 });
+    }
+  }
+
+  // Drop quirks that only have one ability
+  for (const k of Object.keys(raw)) {
+    if ((raw[k]||[]).length < 2) delete raw[k];
+  }
+  return raw;
+}
+
+const QUIRK_MAP = parseQuirkYaml(QUIRK_YAML);
+
+/* Cost mapping: tiered by level, +1/2 bump, then +1 to everything */
+function baseCost(level){
+  if(level<=2) return 2;
+  if(level<=4) return 3;
+  if(level<=6) return 4;
+  if(level<=8) return 5;
+  if(level<=10) return 6;
+  if(level<=12) return 7;
+  return 8;
+}
+function bumpedCost(level){ const add = level<=6 ? 1 : 2; return baseCost(level) + add + 1; }
+/* Price = old notion (cost*100+99), then +25% and round to nearest dollar .99 */
+function priceFromCost(cost){
+  const baseCents = cost*100 + 99;
+  const raisedDollars = Math.round((baseCents/100) * 1.25);
+  return raisedDollars*100 + 99; // force .99
+}
+
+/* Build runtime arrays */
+const QUIRKS = Object.keys(QUIRK_MAP).map(q => ({ id:q.toLowerCase(), name:q }));
+const ABILITIES = [];
+for (const [qName, entries] of Object.entries(QUIRK_MAP)) {
+  for (const {name, level} of entries) {
+    const id = (qName+'_'+name).toLowerCase();
+    const cost = bumpedCost(level);
+    ABILITIES.push({ id, name, quirkId:qName.toLowerCase(), level, cost, priceCents:priceFromCost(cost) });
+  }
+}
+
+/* =======================
+   3) Builder state/helpers
+   ======================= */
+const SLOT_COUNT=5;
+const slots=new Array(SLOT_COUNT).fill(null);
+let activeSlot=0, quirkFilter="all";
+
+const money=c=>`$${(c/100).toFixed(2)}`;
+const costOf=id=>ABILITIES.find(a=>a.id===id)?.cost??0;
+const priceOf=id=>ABILITIES.find(a=>a.id===id)?.priceCents??0;
+const levelOf=id=>ABILITIES.find(a=>a.id===id)?.level??1;
+const nameOf=id=>ABILITIES.find(a=>a.id===id)?.name??id;
+const quirkById=Object.fromEntries(QUIRKS.map(q=>[q.id,q.name]));
+
+function countsByQuirk(arr=slots){const m={};for(const id of arr){if(!id)continue;const q=ABILITIES.find(a=>a.id===id)?.quirkId;m[q]=(m[q]||0)+1;}return m;}
+const totalPoints=(arr=slots)=>arr.filter(Boolean).reduce((s,id)=>s+costOf(id),0);
+const subtotalCents=(arr=slots)=>arr.filter(Boolean).reduce((s,id)=>s+priceOf(id),0);
+
+/* 30% cap of current stack size (min 1) */
+function capForQuirk(quirkId,candidate){
+  const sz = candidate.filter(Boolean).length || SLOT_COUNT;
+  return Math.max(1, Math.floor(0.30 * sz));
+}
+function canPlace(slotIndex,abilityId){
+  const next=slots.slice(); next[slotIndex]=abilityId;
+  if(totalPoints(next)>CONFIG.budgetMax) return {allowed:false,reason:"BUDGET"};
+  const qid=ABILITIES.find(a=>a.id===abilityId)?.quirkId;
+  const c=(countsByQuirk(next)[qid]||0), cap=capForQuirk(qid,next);
+  if(c>cap) return {allowed:false,reason:"CAP"};
+  for(let i=0;i<SLOT_COUNT;i++) if(i!==slotIndex && slots[i]===abilityId) return {allowed:false,reason:"DUP"};
+  return {allowed:true};
+}
+function nextEmptySlot(fromIdx){
+  for(let i=fromIdx+1;i<SLOT_COUNT;i++) if(!slots[i]) return i;
+  for(let i=0;i<fromIdx;i++) if(!slots[i]) return i;
+  return fromIdx;
+}
+
+/* =======================
+   4) DOM
+   ======================= */
+const elSlots=document.getElementById("slots");
+const elAbilityList=document.getElementById("abilityList");
+const elQuirkFilter=document.getElementById("quirkFilter");
+const elCostBar=document.getElementById("costBar");
+const elCostNow=document.getElementById("costNow");
+const elCashTotal=document.getElementById("cashTotal");
+const elStatus=document.getElementById("status");
+const elItemCount=document.getElementById("itemCount");
+const elSubtotal=document.getElementById("subtotal");
+const elGrand=document.getElementById("grand");
+const btnCheckout=document.getElementById("btnCheckout");
+const btnReset=null; // (no reset button in this variant)
+const stackName=document.getElementById("stackName");
+const mcName=document.getElementById("mcName");
+const discordName=document.getElementById("discordName");
+const yamlPreview=document.getElementById("yamlPreview");
+const copyYamlBtn=document.getElementById("copyYaml");
+const downloadYamlBtn=document.getElementById("downloadYaml");
+const emailYamlBtn=document.getElementById("emailYaml");
+
+/* Populate quirk filter chips */
+function renderQuirkFilter(){
+  elQuirkFilter.innerHTML="";
+  const add=(id,label)=>{
+    const b=document.createElement("button");
+    b.type="button"; b.className="chip"+(quirkFilter===id?" active":""); b.textContent=label;
+    b.addEventListener("click", ()=>{ quirkFilter=id; renderAbilityList(); });
+    elQuirkFilter.appendChild(b);
+  };
+  add("all","All");
+  for(const q of QUIRKS) add(q.id,q.name);
+}
+
+/* Renderers */
+function renderSlots(){
+  elSlots.innerHTML="";
+  for(let i=0;i<SLOT_COUNT;i++){
+    const id=slots[i], a=ABILITIES.find(x=>x.id===id);
+    const div=document.createElement("div");
+    div.className="slot"+(a?" filled":"")+(i===activeSlot?" active":"");
+    const label=document.createElement("div"); label.className="label"; label.textContent=`Slot ${i+1}`;
+    const val=document.createElement("div"); val.className="value"; val.textContent=a?`${a.name} (${a.cost} pts · ${money(a.priceCents)})`:"— empty —";
+    div.append(label,val);
+    if(a){ const clear=document.createElement("button"); clear.className="clear"; clear.textContent="remove";
+      clear.onclick=e=>{e.stopPropagation(); slots[i]=null; activeSlot=i; renderAll();}; div.appendChild(clear); }
+    div.onclick=()=>{ activeSlot=i; renderAll(); };
+    elSlots.appendChild(div);
+  }
+}
+function renderAbilityList(){
+  elAbilityList.innerHTML="";
+  const list=ABILITIES.filter(a=>quirkFilter==="all"||a.quirkId===quirkFilter);
+  for(const a of list){
+    const {allowed,reason}=canPlace(activeSlot,a.id);
+    const row=document.createElement("div"); row.className="item"+(allowed?"":" disabled");
+    const left=document.createElement("div"); left.innerHTML=`<div class="name">${a.name}</div><div class="meta">${quirkById[a.quirkId]} · ${a.cost} pts · ${money(a.priceCents)}</div>`;
+    const btn=document.createElement("button"); btn.className="btn";
+    btn.textContent=allowed?"Select":(reason==="BUDGET"?"No Points":reason==="CAP"?"Quirk Cap":"Duplicate");
+    if(allowed) btn.onclick=()=>{ 
+      slots[activeSlot]=a.id;
+      activeSlot = nextEmptySlot(activeSlot);   // auto-advance to next empty
+      renderAll();
+    };
+    row.append(left,btn); elAbilityList.appendChild(row);
+  }
+}
+function buildYaml(){
+  const name = (stackName.value||"Unnamed Stack").trim();
+  const items = slots.filter(Boolean).map(id => ({ ability: nameOf(id), level: levelOf(id) }));
+  let yaml = `${name}:\n`;
+  for(const it of items){ yaml += `  ${it.ability}: ${it.level}\n`; }
+  const mc = mcName.value.trim(), dc = discordName.value.trim();
+  yaml += `# contact:\n#   minecraft: ${mc||"(none)"}\n#   discord: ${dc||"(none)"}\n`;
+  return yaml;
+}
+function renderSummary(){
+  const pts=totalPoints(); elCostNow.textContent=String(pts); elCostBar.value=pts;
+  const items=slots.filter(Boolean), sub=subtotalCents(), grand=sub;
+  elItemCount.textContent=String(items.length); elSubtotal.textContent=money(sub); elGrand.textContent=money(grand); elCashTotal.textContent=money(grand);
+
+  const errs=[]; if(pts>CONFIG.budgetMax) errs.push("budget");
+  const counts=countsByQuirk(); for(const qid of Object.keys(counts)){ const cap=capForQuirk(qid,slots); if(counts[qid]>cap) errs.push("cap"); }
+  const contactOK = (mcName.value.trim().length>0) || (discordName.value.trim().length>0);
+  const nameOK = (stackName.value.trim().length>0);
+  const valid=errs.length===0 && items.length>0 && contactOK && nameOK;
+  elStatus.textContent=valid?"Valid":"Invalid (need rules + contact + name)";
+  elStatus.className="status "+(valid?"ok":"bad");
+  btnCheckout.disabled=!valid;
+
+  yamlPreview.textContent = buildYaml();
+}
+function renderAll(){ renderSlots(); renderQuirkFilter(); renderAbilityList(); renderSummary(); }
+renderAll();
+
+/* Actions */
+document.getElementById("stackName").addEventListener("input", renderSummary);
+document.getElementById("mcName").addEventListener("input", renderSummary);
+document.getElementById("discordName").addEventListener("input", renderSummary);
+
+/* Copy / Download / Email */
+document.getElementById("copyYaml").onclick=async()=>{
+  try{ await navigator.clipboard.writeText(buildYaml()); document.getElementById("copyYaml").textContent="Copied!"; setTimeout(()=>document.getElementById("copyYaml").textContent="Copy YAML",1200); }
+  catch{ alert("Could not copy to clipboard."); }
+};
+document.getElementById("downloadYaml").onclick=()=>{
+  const blob=new Blob([buildYaml()],{type:"text/plain"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  const safe=(stackName.value||"quirk_stack").replace(/[^\w\-]+/g,'_');
+  a.download=`${safe}.yml`;
+  document.body.appendChild(a); a.click(); a.remove();
+};
+document.getElementById("emailYaml").onclick=()=>{
+  const subject = encodeURIComponent(`Custom Quirk Stack Submission — ${(stackName.value||'Unnamed Stack').trim()}`);
+  const body = encodeURIComponent(buildYaml() + `\n— Sent from the Quirk Stack Builder`);
+  window.location.href=`mailto:dynamizt@myherounbound.com?subject=${subject}&body=${body}`;
+};
+</script>
+</body>
+</html>
