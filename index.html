@@ -6,7 +6,7 @@
 <title>Custom Quirk Stack Builder</title>
 <style>
   :root{
-    --cream:#EEE7D6; --navy:#0B1120; --navyHover:#1a2744; --brandRed:#C85158;
+    --cream:#e7e3d9; --navy:#131824; --navyHover:#2a3350; --brandRed:#C85158;
     --muted:#3c4150; --border: rgba(11,17,32,.14); --ok:#1d8a58; --bad:#c0273a;
   }
   *{box-sizing:border-box}
@@ -119,9 +119,9 @@
     <h3 style="margin-top:16px">Your Quirk Stack (YAML)</h3>
     <pre id="yamlPreview"></pre>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn" id="copyYaml">Copy YAML</button>
+      <!-- removed: Copy YAML -->
       <button class="btn" id="downloadYaml">Download YAML</button>
-      <button class="btn" id="emailYaml">Email to Admin</button>
+      <!-- removed: Email to Admin -->
     </div>
   </aside>
 </main>
@@ -548,9 +548,7 @@ const stackName=document.getElementById("stackName");
 const mcName=document.getElementById("mcName");
 const discordName=document.getElementById("discordName");
 const yamlPreview=document.getElementById("yamlPreview");
-const copyYamlBtn=document.getElementById("copyYaml");
 const downloadYamlBtn=document.getElementById("downloadYaml");
-const emailYamlBtn=document.getElementById("emailYaml");
 
 /* Populate quirk filter chips */
 function renderQuirkFilter(){
@@ -631,24 +629,48 @@ document.getElementById("stackName").addEventListener("input", renderSummary);
 document.getElementById("mcName").addEventListener("input", renderSummary);
 document.getElementById("discordName").addEventListener("input", renderSummary);
 
-/* Copy / Download / Email */
-document.getElementById("copyYaml").onclick=async()=>{
-  try{ await navigator.clipboard.writeText(buildYaml()); document.getElementById("copyYaml").textContent="Copied!"; setTimeout(()=>document.getElementById("copyYaml").textContent="Copy YAML",1200); }
-  catch{ alert("Could not copy to clipboard."); }
-};
-document.getElementById("downloadYaml").onclick=()=>{
-  const blob=new Blob([buildYaml()],{type:"text/plain"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  const safe=(stackName.value||"quirk_stack").replace(/[^\w\-]+/g,'_');
-  a.download=`${safe}.yml`;
-  document.body.appendChild(a); a.click(); a.remove();
-};
-document.getElementById("emailYaml").onclick=()=>{
-  const subject = encodeURIComponent(`Custom Quirk Stack Submission — ${(stackName.value||'Unnamed Stack').trim()}`);
-  const body = encodeURIComponent(buildYaml() + `\n— Sent from the Quirk Stack Builder`);
-  window.location.href=`mailto:dynamizt@myherounbound.com?subject=${subject}&body=${body}`;
-};
+/* Download YAML only (copy + email removed) */
+if (typeof downloadYamlBtn !== 'undefined' && downloadYamlBtn) {
+  downloadYamlBtn.onclick = function (e) {
+    e.preventDefault();
+    const yaml = buildYaml();
+    const safeName = ((stackName.value || 'quirk_stack').trim().replace(/[^\w\-]+/g, '_')) || 'quirk_stack';
+    const filename = safeName + '.yml';
+
+    try {
+      // Try Blob download first
+      const blob = new Blob([yaml], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (err) {
+      // Fallback to data URL
+      const url = 'data:text/plain;charset=utf-8,' + encodeURIComponent(yaml);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+  };
+}
+
+/* Checkout → Ko-fi */
+if (typeof btnCheckout !== 'undefined' && btnCheckout) {
+  btnCheckout.onclick = function (e) {
+    e.preventDefault();
+    if (btnCheckout.disabled) return;
+    // Using same-tab navigation avoids popup blockers in some builders
+    window.location.href = 'https://ko-fi.com/myherounbound#pageMessageModal';
+  };
+}
+
 </script>
 </body>
 </html>
